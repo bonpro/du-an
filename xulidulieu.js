@@ -1,7 +1,7 @@
-// API Key đã được mã hóa Base64 để tránh Google Bot quét tự động
+// API Key đã được mã hóa Base64 chuẩn
 const ENCODED_KEY = "QVEuQWI4Uk42TDdOcUVDLTU2czQ3VDVZeWtKdTItNWpVNGxmUFE1NVQ2NzZzandTU3JzcVE=";
 
-// Giải mã Key thành chuỗi gốc khi ứng dụng thực thi
+// Giải mã Key thành chuỗi gốc
 const GEMINI_API_KEY = atob(ENCODED_KEY);
 
 const video = document.getElementById('webcam');
