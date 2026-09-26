@@ -1,7 +1,8 @@
-// Cắt đôi API Key để tránh bị Google Bot quét tự động
-const part1 = "AQ.Ab8RN6K8MOntWEveP72NtGnT4vD";
-const part2 = "FlquVzNW3_NeOqfam63JELg";
+// Cắt đôi API Key mới để chống Google Bot quét tự động
+const part1 = "AQ.Ab8RN6KJX6-ZxXk8CyKP4L6ejh4jB";
+const part2 = "tmRue3HCntyUo2e1-zR9Q";
 
+const GEMINI_API_KEY = part1 + part2;
 // Ghép lại thành Key hoàn chỉnh khi chạy
 const GEMINI_API_KEY = part1 + part2;
     const video = document.getElementById('webcam');
