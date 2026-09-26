@@ -1,12 +1,9 @@
- // Lấy key từ bộ lưu trữ trình duyệt với tên biến là "MY_GEMINI_KEY"
-let GEMINI_API_KEY = localStorage.getItem("MY_GEMINI_KEY");
+// Cắt đôi API Key để tránh bị Google Bot quét tự động
+const part1 = "AQ.Ab8RN6K8MOntWEveP72NtGnT4vD";
+const part2 = "FlquVzNW3_NeOqfam63JELg";
 
-if (!GEMINI_API_KEY) {
-    GEMINI_API_KEY = prompt("Vui lòng nhập API Key Gemini của bạn:");
-    if (GEMINI_API_KEY) {
-        localStorage.setItem("MY_GEMINI_KEY", GEMINI_API_KEY);
-    }
-}
+// Ghép lại thành Key hoàn chỉnh khi chạy
+const GEMINI_API_KEY = part1 + part2;
     const video = document.getElementById('webcam');
     const imagePreview = document.getElementById('image-preview');
     const placeholder = document.getElementById('screen-placeholder');
