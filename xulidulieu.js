@@ -1,5 +1,12 @@
-    const GEMINI_API_KEY = 'AQ.Ab8RN6JNviEO8otp1c_U1ez1xQ3eOEFH8kdo6qisJ3peu_n7ww';
+ // Lấy key từ bộ lưu trữ trình duyệt với tên biến là "MY_GEMINI_KEY"
+let GEMINI_API_KEY = localStorage.getItem("MY_GEMINI_KEY");
 
+if (!GEMINI_API_KEY) {
+    GEMINI_API_KEY = prompt("Vui lòng nhập API Key Gemini của bạn:");
+    if (GEMINI_API_KEY) {
+        localStorage.setItem("MY_GEMINI_KEY", GEMINI_API_KEY);
+    }
+}
     const video = document.getElementById('webcam');
     const imagePreview = document.getElementById('image-preview');
     const placeholder = document.getElementById('screen-placeholder');
