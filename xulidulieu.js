@@ -1,4 +1,4 @@
-    const GEMINI_API_KEY = 'AQ.Ab8RN6KaFoCMNvJbpoU7fAV_hxPRSbMI023uSy5zDJ5zXfy7fw';
+    const GEMINI_API_KEY = 'AQ.Ab8RN6JNviEO8otp1c_U1ez1xQ3eOEFH8kdo6qisJ3peu_n7ww';
 
     const video = document.getElementById('webcam');
     const imagePreview = document.getElementById('image-preview');
