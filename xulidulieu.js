@@ -1,6 +1,5 @@
 // API Key đã được mã hóa Base64 chuẩn
 const ENCODED_KEY = "QVEuQWI4Uk42TDdOcUVDLTU2czQ3VDVZeWtKdTItNWpVNGxmUFE1NVQ2NzZzandTU3JzcVE=";
-
 // Giải mã Key thành chuỗi gốc
 const GEMINI_API_KEY = atob(ENCODED_KEY);
 
