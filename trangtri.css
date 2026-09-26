@@ -1,0 +1,287 @@
+    :root {
+    --bg-dark: #0a0e17;
+    --panel-bg: rgba(16, 24, 39, 0.85);
+    --cyan-glow: #00f3ff;
+    --danger-glow: #ff0055;
+    --text-main: #e0f7fc;
+    --border-color: rgba(0, 243, 255, 0.3);
+    }
+
+    * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto Mono', monospace;
+    }
+
+    body {
+    background-color: var(--bg-dark);
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(0, 243, 255, 0.05) 0%, transparent 80%),
+        linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 30px 30px, 30px 30px;
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    }
+
+    .container {
+    width: 100%;
+    max-width: 1200px;
+    }
+
+    .header {
+    text-align: center;
+    margin-bottom: 25px;
+    }
+
+    .logo-glitch {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--cyan-glow);
+    text-shadow: 0 0 12px var(--cyan-glow);
+    letter-spacing: 2px;
+    }
+
+    .logo-glitch span {
+    color: var(--danger-glow);
+    }
+
+    .subtitle {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    margin-top: 5px;
+    letter-spacing: 1px;
+    }
+
+    .main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+    .main-content { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 243, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    }
+
+    .panel-header {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    color: var(--cyan-glow);
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+    }
+
+    .screen-box {
+    position: relative;
+    width: 100%;
+    height: 320px;
+    background: #050811;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    }
+
+    .screen-box video, .screen-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    }
+
+    #screen-placeholder {
+    color: rgba(0, 243, 255, 0.4);
+    font-size: 0.9rem;
+    }
+
+    .scan-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--cyan-glow);
+    box-shadow: 0 0 15px var(--cyan-glow);
+    display: none;
+    animation: scan 2s infinite ease-in-out;
+    }
+
+    @keyframes scan {
+    0% { top: 0; }
+    50% { top: 98%; }
+    100% { top: 0; }
+    }
+
+    .control-btns {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+    }
+
+    .btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    text-align: center;
+    }
+
+    .btn-cyber {
+    background: transparent;
+    color: var(--cyan-glow);
+    border: 1px solid var(--cyan-glow);
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
+    }
+
+    .btn-cyber:hover:not(:disabled) {
+    background: var(--cyan-glow);
+    color: #000;
+    box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    .btn-danger {
+    background: transparent;
+    color: var(--danger-glow);
+    border: 1px solid var(--danger-glow);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+    background: var(--danger-glow);
+    color: #fff;
+    box-shadow: 0 0 15px var(--danger-glow);
+    }
+
+    .btn-outline {
+    display: block;
+    border: 1px dashed var(--border-color);
+    color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+    border-color: var(--cyan-glow);
+    color: var(--cyan-glow);
+    }
+
+    .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    }
+
+    .result-box {
+    flex-grow: 1;
+    min-height: 250px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    }
+
+    .result-box h1, .result-box h2, .result-box h3 {
+    color: var(--cyan-glow);
+    margin-top: 10px;
+    margin-bottom: 5px;
+    }
+
+    .qa-section {
+    margin-top: 15px;
+    }
+
+    .qa-input-group {
+    display: flex;
+    gap: 10px;
+    }
+
+    .qa-input-group input {
+    flex-grow: 1;
+    background: #050811;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px 15px;
+    color: var(--text-main);
+    outline: none;
+    }
+
+    .qa-input-group input:focus {
+    border-color: var(--cyan-glow);
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.3);
+    }
+
+    .loading-spinner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--cyan-glow);
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    }
+
+    .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid transparent;
+    border-top-color: var(--cyan-glow);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+    to { transform: rotate(360deg); }
+    }
+    /* Nút Micro & Trạng thái giọng nói */
+    .btn-mic {
+    background: transparent;
+    color: #ffaa00;
+    border: 1px solid #ffaa00;
+    padding: 10px 14px;
+    }
+
+    .btn-mic:hover:not(:disabled) {
+    background: #ffaa00;
+    color: #000;
+    box-shadow: 0 0 12px #ffaa00;
+    }
+
+    .btn-mic.recording {
+    background: var(--danger-glow);
+    color: #fff;
+    border-color: var(--danger-glow);
+    animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 0, 85, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
+    }
+
+    .voice-status {
+    font-size: 0.75rem;
+    color: #ffaa00;
+    margin-top: 5px;
+    min-height: 16px;
+    }    

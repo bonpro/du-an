@@ -1,0 +1,68 @@
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision Analysis System</title>
+    <link rel="stylesheet" href="trangtri.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    </head>
+    <body>
+    <div class="container">
+        <header class="header">
+        <div class="logo-glitch">ZERO</span> AI</div>
+        <p class="subtitle">HỆ THỐNG CHƯA CÓ TÊN</p>
+        </header>
+
+        <main class="main-content">
+        <!-- Cột Trái: Camera & Quét -->
+        <section class="panel camera-panel">
+            <div class="panel-header">INPUT SOURCE</div>
+            <div class="screen-box">
+            <video id="webcam" autoplay playsinline style="display: none;"></video>
+            <img id="image-preview" src="" alt="Preview" style="display: none;">
+            <div id="scan-line" class="scan-line"></div>
+            <div id="screen-placeholder">SẴN SÀNG QUÉT DỮ LIỆU</div>
+            </div>
+
+            <div class="control-btns">
+            <button id="start-btn" class="btn btn-cyber">MỞ CAMERA</button>
+            <button id="capture-btn" class="btn btn-danger" disabled>QUÉT CAMERA</button>
+            </div>
+
+            <label for="file-input" class="btn btn-outline">
+            📁 TẢI CƠ SỞ DỮ LIỆU (ẢNH)
+            </label>
+            <input type="file" id="file-input" accept="image/*" hidden>
+        </section>
+
+        <!-- Cột Phải: Kết Quả & Trợ Lý Giọng Nói -->
+        <section class="panel result-panel">
+            <div class="panel-header">ANALYSIS & INTERACTION</div>
+            
+            <div id="loading" class="loading-spinner" style="display: none;">
+            <div class="spinner"></div>
+            <span>ĐANG TRUY VẤN MÁY CHỦ AI...</span>
+            </div>
+
+            <div id="result-content" class="result-box">
+            <p class="placeholder-text">Chưa có dữ liệu. Vui lòng tải ảnh hoặc mở camera để bắt đầu.</p>
+            </div>
+
+            <!-- Khung tương tác câu hỏi bằng Giọng Nói & Văn Bản -->
+            <div class="qa-section">
+            <div class="qa-input-group">
+                <button id="mic-btn" class="btn btn-mic" disabled title="Bấm để nói">🎤 NÓI</button>
+                <input type="text" id="user-question" placeholder="Nhấn nút NÓI hoặc nhập câu hỏi..." disabled>
+                <button id="ask-btn" class="btn btn-cyber" disabled>GỬI</button>
+            </div>
+            <p id="voice-status" class="voice-status"></p>
+            </div>
+        </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="xulidulieu.js"></script>
+    </body>
+    </html>
