@@ -21,30 +21,48 @@ let currentBase64Image = null;
 // ==========================================
 // 1. PHÁT GIỌNG NÓI TIẾNG VIỆT
 // ==========================================
+// ==========================================
+// BỘ PHÁT GIỌNG NÓI TIẾNG VIỆT CHUẨN TỰ NHIÊN
+// ==========================================
 function speakText(text) {
     if (!('speechSynthesis' in window)) return;
     
-    window.speechSynthesis.cancel();
-    let cleanText = text.replace(/\(.*?\)/g, '').replace(/[*#_\-`]/g, '').trim();
+    window.speechSynthesis.cancel(); // Dừng câu đang đọc cũ
+
+    // Làm sạch văn bản: Bỏ ký tự đặc biệt, dấu câu Markdown để tránh AI đọc vấp
+    let cleanText = text
+        .replace(/\(.*?\)/g, '')
+        .replace(/[*#_\-`~>]/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .trim();
+
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'vi-VN';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.1;
+    utterance.rate = 0.95; // Tốc độ đọc vừa phải, không bị nuốt chữ
+    utterance.pitch = 1.0;  // Tông giọng tự nhiên
 
     const voices = window.speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => 
-        (v.lang.includes('vi') || v.lang.includes('VI')) && 
-        (v.name.includes('HoaiMy') || v.name.includes('Linh') || v.name.includes('Female') || v.name.includes('Google'))
-    ) || voices.find(v => v.lang.includes('vi') || v.lang.includes('VI'));
+    
+    // Ưu tiên chọn giọng đọc chuẩn tiếng Việt của Microsoft hoặc Google
+    const bestVoice = voices.find(v => 
+        (v.lang === 'vi-VN' || v.lang === 'vi_VN') && 
+        (v.name.includes('HoaiMy') || v.name.includes('NamMinh') || v.name.includes('Google') || v.name.includes('Natural'))
+    ) || voices.find(v => v.lang.startsWith('vi'));
 
-    if (femaleVoice) utterance.voice = femaleVoice;
+    if (bestVoice) {
+        utterance.voice = bestVoice;
+    }
+
     window.speechSynthesis.speak(utterance);
 }
 
+// Đảm bảo danh sách giọng đọc luôn được load sẵn khi vào trang
 if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+    };
 }
 
 // ==========================================
