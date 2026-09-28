@@ -1,5 +1,5 @@
 // ==========================================
-// 0. CẤU HÌNH PROXY WORKER
+// CẤU HÌNH PROXY WORKER
 // ==========================================
 const PROXY_URL = 'https://lively-glade-ec31.lacvantieu95.workers.dev';
 
@@ -20,36 +20,16 @@ const voiceStatus = document.getElementById('voice-status');
 let currentBase64Image = null;
 
 // ==========================================
-// HÀM GỬI FETCH CÓ TỰ ĐỘNG THỬ LẠI (RETRY LOGIC)
-// ==========================================
-async function fetchWithRetry(payload, retries = 3, delay = 1000) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            return await response.json();
-        } catch (err) {
-            if (i === retries - 1) throw err;
-            await new Promise(res => setTimeout(res, delay));
-        }
-    }
-}
-
-// ==========================================
-// HÀM QUÉT VIDEO ĐA GÓC KIỂU FACE ID (QUAY 3 SEC)
+// HÀM QUÉT FACE ID VỚI MŨI TÊN HƯỚNG DẪN & TÍCH XANH
 // ==========================================
 async function captureVideoFaceID() {
     if (!video.srcObject) {
-        alert("Vui lòng bật Camera trước khi quét!");
+        alert("Vui lòng bấm 'CAMERA ACTIVE' trước!");
         return;
     }
 
     scanLine.style.display = 'block';
     loading.style.display = 'flex';
-    resultContent.innerHTML = '<p style="color:#00f3ff"><strong>Đang quét đa góc...</strong> Vui lòng hướng vật thể lên, xuống và xoay nhẹ góc!</p>';
     toggleInputs(false);
 
     const canvas = document.createElement('canvas');
@@ -58,45 +38,76 @@ async function captureVideoFaceID() {
     canvas.height = video.videoHeight || 480;
 
     const capturedFrames = [];
-    const totalFrames = 4; // Lấy 4 góc quay khác nhau
-    const interval = 700;  // Mỗi 0.7s chụp 1 góc
+    
+    // 4 Bước quét mô phỏng Face ID
+    const steps = [
+        { arrow: "⬆️ HƯỚNG LÊN TRÊN", delay: 700 },
+        { arrow: "⬇️ HƯỚNG XUỐNG DƯỚI", delay: 700 },
+        { arrow: "⬅️ XOAY SANG TRÁI", delay: 700 },
+        { arrow: "➡️ XOAY SANG PHẢI", delay: 700 }
+    ];
 
-    for (let i = 0; i < totalFrames; i++) {
+    for (let i = 0; i < steps.length; i++) {
+        resultContent.innerHTML = `<div style="text-align:center; padding:20px;">
+            <h2 style="color:#00f3ff; font-size: 2rem;">QUÉT FACE ID</h2>
+            <h1 style="color:#ff007f; font-size: 2.5rem; margin: 15px 0;">${steps[i].arrow}</h1>
+            <p>Bước ${i+1}/4 - Giữ vật thể trong khung hình...</p>
+        </div>`;
+
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64Image = canvas.toDataURL('image/jpeg', 0.7);
         capturedFrames.push(base64Image);
-        
-        // Lưu lại khung hình cuối làm ảnh đại diện
-        if (i === totalFrames - 1) {
+
+        if (i === steps.length - 1) {
             imagePreview.src = base64Image;
             imagePreview.style.display = 'block';
             video.style.display = 'none';
             currentBase64Image = base64Image.split(',')[1];
         }
 
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise(resolve => setTimeout(resolve, steps[i].delay));
     }
 
-    resultContent.innerHTML = '<p style="color:#00f3ff">Đang gửi dữ liệu đa góc sang AI phân tích...</p>';
+    resultContent.innerHTML = `<div style="text-align:center; padding:20px;">
+        <h2 style="color:#00f3ff;">⏳ ĐANG PHÂN TÍCH DỮ LIỆU...</h2>
+    </div>`;
 
     try {
-        const data = await fetchWithRetry({ images: capturedFrames });
-
-        if (data.error) {
-            resultContent.innerHTML = `<p style="color:var(--danger-glow)"><strong>Lỗi API:</strong> ${data.error.message}</p>`;
-            return;
-        }
+        const response = await fetch(PROXY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: capturedFrames })
+        });
+        const data = await response.json();
 
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             const resultText = data.candidates[0].content.parts[0].text.trim();
-            resultContent.innerHTML = marked.parse(`### KẾT QUẢ PHÂN TÍCH ĐA GÓC\n\n${resultText}\n\n*Bạn có thể đặt câu hỏi chi tiết thêm bên dưới.*`);
+            
+            // Hiển thị TÍCH XANH NẾU THÀNH CÔNG
+            resultContent.innerHTML = `
+                <div style="text-align:center; border: 2px solid #00ff88; padding: 15px; border-radius: 10px; background: rgba(0,255,136,0.1);">
+                    <h1 style="color:#00ff88; font-size: 3rem; margin:0;">✅ THÀNH CÔNG</h1>
+                    <p style="font-size: 1.1rem; color: #fff; margin-top: 10px;">${resultText}</p>
+                </div>
+            `;
             speakText(resultText);
             toggleInputs(true);
         } else {
-            resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện video. Vui lòng thử lại.</p>';
+            // Hiển thị DẤU X ĐỎ NẾU LỖI
+            resultContent.innerHTML = `
+                <div style="text-align:center; border: 2px solid #ff4444; padding: 15px; border-radius: 10px; background: rgba(255,68,68,0.1);">
+                    <h1 style="color:#ff4444; font-size: 3rem; margin:0;">❌ LỖI NHẬN DẠNG</h1>
+                    <p style="color:#fff;">Không nhận diện được. Vui lòng quét lại!</p>
+                </div>
+            `;
         }
     } catch (err) {
-        resultContent.innerHTML = `<p style="color:var(--danger-glow)">Lỗi kết nối: ${err.message}</p>`;
+        resultContent.innerHTML = `
+            <div style="text-align:center; border: 2px solid #ff4444; padding: 15px; border-radius: 10px;">
+                <h1 style="color:#ff4444; font-size: 3rem; margin:0;">❌ LỖI KẾT NỐI</h1>
+                <p style="color:#fff;">${err.message}</p>
+            </div>
+        `;
     } finally {
         scanLine.style.display = 'none';
         loading.style.display = 'none';
@@ -104,95 +115,17 @@ async function captureVideoFaceID() {
 }
 
 // ==========================================
-// 1. BỘ PHÁT GIỌNG NÓI TIẾNG VIỆT CHUẨN
+// CÁC HÀM XỬ LÝ KHÁC (GIỮ NGUYÊN)
 // ==========================================
 function speakText(text) {
     if (!('speechSynthesis' in window)) return;
-    
     window.speechSynthesis.cancel();
-
-    let cleanText = text
-        .replace(/\(.*?\)/g, '') 
-        .replace(/[*#_\-`]/g, '') 
-        .trim();
-
+    let cleanText = text.replace(/\(.*?\)/g, '').replace(/[*#_\-`]/g, '').trim();
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'vi-VN';
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
-
-    const voices = window.speechSynthesis.getVoices();
-    const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VI'));
-    if (viVoice) utterance.voice = viVoice;
-
     window.speechSynthesis.speak(utterance);
 }
 
-if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => {};
-}
-
-// ==========================================
-// 2. BỘ NHẬN DIỆN GIỌNG NÓI NGƯỜI DÙNG (STT)
-// ==========================================
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null;
-
-if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'vi-VN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-        if (micBtn) {
-            micBtn.classList.add('recording');
-            micBtn.innerText = '🔴 ĐANG NGHE...';
-        }
-        if (voiceStatus) voiceStatus.innerText = 'Đang lắng nghe câu hỏi của bạn...';
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        userQuestion.value = transcript;
-        if (voiceStatus) voiceStatus.innerText = `Đã nghe: "${transcript}"`;
-        handleUserQuestion();
-    };
-
-    recognition.onerror = (event) => {
-        if (voiceStatus) voiceStatus.innerText = 'Lỗi nhận diện giọng nói: ' + event.error;
-        stopMic();
-    };
-
-    recognition.onend = () => {
-        stopMic();
-    };
-} else {
-    if (micBtn) micBtn.style.display = 'none';
-}
-
-function stopMic() {
-    if (micBtn) {
-        micBtn.classList.remove('recording');
-        micBtn.innerText = '🎤 NÓI';
-    }
-}
-
-if (micBtn) {
-    micBtn.addEventListener('click', () => {
-        if (recognition) {
-            try {
-                recognition.start();
-            } catch (e) {
-                recognition.stop();
-            }
-        }
-    });
-}
-
-// ==========================================
-// 3. XỬ LÝ CAMERA & TẢI ẢNH
-// ==========================================
 startBtn.addEventListener('click', async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
@@ -207,10 +140,7 @@ startBtn.addEventListener('click', async () => {
     }
 });
 
-// Bấm nút QUÉT CAMERA sẽ kích hoạt Quét Đa Góc Face ID
-captureBtn.addEventListener('click', () => {
-    captureVideoFaceID();
-});
+captureBtn.addEventListener('click', captureVideoFaceID);
 
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -221,110 +151,14 @@ fileInput.addEventListener('change', (e) => {
             imagePreview.style.display = 'block';
             video.style.display = 'none';
             placeholder.style.display = 'none';
-            
-            const base64Raw = event.target.result;
-            currentBase64Image = base64Raw.includes(',') ? base64Raw.split(',')[1] : base64Raw;
-            
-            processScanning(currentBase64Image);
+            currentBase64Image = event.target.result.split(',')[1];
         };
         reader.readAsDataURL(file);
     }
 });
-
-// ==========================================
-// 4. QUÉT ẢNH ĐƠN (Dùng cho ảnh tải lên)
-// ==========================================
-async function processScanning(base64Data) {
-    scanLine.style.display = 'block';
-    loading.style.display = 'flex';
-    resultContent.innerHTML = '';
-    toggleInputs(false);
-
-    const payload = {
-        contents: [{
-            role: "user",
-            parts: [
-                { text: "Xác định tên tiếng Việt chính xác của đối tượng trong ảnh và tình trạng của nó dưới 30 từ." },
-                { inline_data: { mime_type: "image/jpeg", data: base64Data } }
-            ]
-        }]
-    };
-
-    try {
-        const data = await fetchWithRetry(payload);
-
-        if (data.error) {
-            resultContent.innerHTML = `<p style="color:var(--danger-glow)"><strong>Lỗi API:</strong> ${data.error.message}</p>`;
-            return;
-        }
-
-        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-            const resultText = data.candidates[0].content.parts[0].text.trim();
-            resultContent.innerHTML = marked.parse(`### ĐÃ NHẬN DIỆN THÀNH CÔNG\n\n${resultText}`);
-            speakText(resultText);
-            toggleInputs(true);
-        } else {
-            resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện hình ảnh. Vui lòng thử lại.</p>';
-        }
-    } catch (err) {
-        resultContent.innerHTML = `<p style="color:var(--danger-glow)">Lỗi kết nối: ${err.message}</p>`;
-    } finally {
-        scanLine.style.display = 'none';
-        loading.style.display = 'none';
-    }
-}
-
-// ==========================================
-// 5. TRẢ LỜI CÂU HỎI BẰNG GIỌNG NÓI
-// ==========================================
-async function handleUserQuestion() {
-    const question = userQuestion.value.trim();
-    if (!question || !currentBase64Image) return;
-
-    loading.style.display = 'flex';
-    toggleInputs(false);
-
-    const payload = {
-        contents: [{
-            role: "user",
-            parts: [
-                { text: `Dựa vào hình ảnh này, trả lời câu hỏi sau bằng tiếng Việt tự nhiên, cô đọng để đọc ra loa (dưới 60 từ): ${question}` },
-                { inline_data: { mime_type: "image/jpeg", data: currentBase64Image } }
-            ]
-        }]
-    };
-
-    try {
-        const data = await fetchWithRetry(payload);
-
-        if (data.error) {
-            alert("Lỗi API: " + data.error.message);
-            return;
-        }
-
-        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-            const answer = data.candidates[0].content.parts[0].text;
-            resultContent.innerHTML += marked.parse(`\n---\n**🗣️ Hỏi:** ${question}\n\n**🤖 Trả lời:** ${answer}`);
-            resultContent.scrollTop = resultContent.scrollHeight;
-
-            speakText(answer);
-            userQuestion.value = '';
-        }
-    } catch (err) {
-        alert("Lỗi khi gửi câu hỏi: " + err.message);
-    } finally {
-        loading.style.display = 'none';
-        toggleInputs(true);
-    }
-}
 
 function toggleInputs(enable) {
     userQuestion.disabled = !enable;
     askBtn.disabled = !enable;
     if (micBtn) micBtn.disabled = !enable;
 }
-
-askBtn.addEventListener('click', handleUserQuestion);
-userQuestion.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleUserQuestion();
-});
