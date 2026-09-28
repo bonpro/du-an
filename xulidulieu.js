@@ -22,32 +22,45 @@ let currentBase64Image = null;
 // ==========================================
 // TỰ ĐỘNG THỬ LẠI KHI GOOGLE BỊ QUÁ TẢI (RETRY LOGIC)
 // ==========================================
-async function fetchWithRetry(payload, maxRetries = 3, delay = 2000) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+async function captureVideoFaceID() {
+  const videoElement = document.getElementById('webcam'); // Đảm bảo ID đúng với thẻ <video> của bạn
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  canvas.width = videoElement.videoWidth || 640;
+  canvas.height = videoElement.videoHeight || 480;
 
-            const data = await response.json();
+  const capturedFrames = [];
+  const totalFrames = 4; // Lấy 4 góc quay khác nhau
+  const interval = 800;  // Mỗi 0.8 giây chụp 1 góc
 
-            // Nếu gặp lỗi 503 (Server bận/quá tải) hoặc 429 (Rate limit), tiến hành tự động gửi lại
-            if (response.status === 503 || response.status === 429) {
-                if (attempt < maxRetries) {
-                    console.warn(`Máy chủ bận (Lần ${attempt}/${maxRetries}), thử lại sau ${delay / 1000}s...`);
-                    await new Promise(res => setTimeout(res, delay));
-                    delay *= 1.5;
-                    continue;
-                }
-            }
-            return data;
-        } catch (err) {
-            if (attempt === maxRetries) throw err;
-            await new Promise(res => setTimeout(res, delay));
-        }
-    }
+  showStatusUI("Đang quét Face ID... Hãy hướng vật thể lên, xuống, xoay nhẹ góc!");
+
+  for (let i = 0; i < totalFrames; i++) {
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    const base64Image = canvas.toDataURL('image/jpeg', 0.7); // Nén ảnh 70% để gửi nhẹ và nhanh
+    capturedFrames.push(base64Image);
+    
+    // Đợi 0.8s cho lần chụp tiếp theo
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+
+  showStatusUI("Đang phân tích dữ liệu đa góc...");
+
+  // Gửi mảng ảnh sang Cloudflare Worker
+  fetch('https://lively-glade-ec31.lacvantieu95.workers.dev/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ images: capturedFrames })
+  })
+  .then(res => res.json())
+  .then(data => {
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    renderResultUI(reply);
+  })
+  .catch(err => {
+    renderErrorUI("Lỗi quét: " + err.message);
+  });
 }
 
 // ==========================================
