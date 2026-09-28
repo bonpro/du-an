@@ -1,7 +1,7 @@
-// API Key đã được mã hóa Base64 chuẩn
-const ENCODED_KEY = "QVEuQWI4Uk42TDdOcUVDLTU2czQ3VDVZeWtKdTItNWpVNGxmUFE1NVQ2NzZzandTU3JzcVE=";
-// Giải mã Key thành chuỗi gốc
-const GEMINI_API_KEY = atob(ENCODED_KEY);
+// ==========================================
+// 0. CẤU HÌNH PROXY WORKER
+// ==========================================
+const PROXY_URL = 'https://lively-glade-ec31.lacvantieu95.workers.dev';
 
 const video = document.getElementById('webcam');
 const imagePreview = document.getElementById('image-preview');
@@ -17,17 +17,47 @@ const askBtn = document.getElementById('ask-btn');
 const micBtn = document.getElementById('mic-btn');
 const voiceStatus = document.getElementById('voice-status');
 
-    let currentBase64Image = null;
+let currentBase64Image = null;
 
-    // ==========================================
-    // 1. BỘ PHÁT GIỌNG NÓI TIẾNG VIỆT CHUẨN
-    // ==========================================
-    function speakText(text) {
+// ==========================================
+// TỰ ĐỘNG THỬ LẠI KHI GOOGLE BỊ QUÁ TẢI (RETRY LOGIC)
+// ==========================================
+async function fetchWithRetry(payload, maxRetries = 3, delay = 2000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            // Nếu gặp lỗi 503 (Server bận/quá tải) hoặc 429 (Rate limit), tiến hành tự động gửi lại
+            if (response.status === 503 || response.status === 429) {
+                if (attempt < maxRetries) {
+                    console.warn(`Máy chủ bận (Lần ${attempt}/${maxRetries}), thử lại sau ${delay / 1000}s...`);
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 1.5;
+                    continue;
+                }
+            }
+            return data;
+        } catch (err) {
+            if (attempt === maxRetries) throw err;
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
+}
+
+// ==========================================
+// 1. BỘ PHÁT GIỌNG NÓI TIẾNG VIỆT CHUẨN
+// ==========================================
+function speakText(text) {
     if (!('speechSynthesis' in window)) return;
     
-    window.speechSynthesis.cancel(); // Dừng câu nói trước đó
+    window.speechSynthesis.cancel();
 
-    // Làm sạch văn bản để giọng đọc mượt mà
     let cleanText = text
         .replace(/\(.*?\)/g, '') 
         .replace(/[*#_\-`]/g, '') 
@@ -43,27 +73,29 @@ const voiceStatus = document.getElementById('voice-status');
     if (viVoice) utterance.voice = viVoice;
 
     window.speechSynthesis.speak(utterance);
-    }
+}
 
-    if ('speechSynthesis' in window) {
+if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = () => {};
-    }
+}
 
-    // ==========================================
-    // 2. BỘ NHẬN DIỆN GIỌNG NÓI NGƯỜI DÙNG (STT)
-    // ==========================================
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = null;
+// ==========================================
+// 2. BỘ NHẬN DIỆN GIỌNG NÓI NGƯỜI DÙNG (STT)
+// ==========================================
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
 
-    if (SpeechRecognition) {
+if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.lang = 'vi-VN';
     recognition.continuous = false;
     recognition.interimResults = false;
 
     recognition.onstart = () => {
-        micBtn.classList.add('recording');
-        micBtn.innerText = '🔴 ĐANG NGHE...';
+        if (micBtn) {
+            micBtn.classList.add('recording');
+            micBtn.innerText = '🔴 ĐANG NGHE...';
+        }
         if (voiceStatus) voiceStatus.innerText = 'Đang lắng nghe câu hỏi của bạn...';
     };
 
@@ -82,33 +114,33 @@ const voiceStatus = document.getElementById('voice-status');
     recognition.onend = () => {
         stopMic();
     };
-    } else {
+} else {
     if (micBtn) micBtn.style.display = 'none';
-    }
+}
 
-    function stopMic() {
+function stopMic() {
     if (micBtn) {
         micBtn.classList.remove('recording');
         micBtn.innerText = '🎤 NÓI';
     }
-    }
+}
 
-    if (micBtn) {
+if (micBtn) {
     micBtn.addEventListener('click', () => {
         if (recognition) {
-        try {
-            recognition.start();
-        } catch (e) {
-            recognition.stop();
-        }
+            try {
+                recognition.start();
+            } catch (e) {
+                recognition.stop();
+            }
         }
     });
-    }
+}
 
-    // ==========================================
-    // 3. XỬ LÝ CAMERA & TẢI ẢNH
-    // ==========================================
-    startBtn.addEventListener('click', async () => {
+// ==========================================
+// 3. XỬ LÝ CAMERA & TẢI ẢNH
+// ==========================================
+startBtn.addEventListener('click', async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
         video.srcObject = stream;
@@ -120,9 +152,9 @@ const voiceStatus = document.getElementById('voice-status');
     } catch (err) {
         alert('Không thể mở Camera: ' + err.message);
     }
-    });
+});
 
-    function getCameraBase64() {
+function getCameraBase64() {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -134,78 +166,66 @@ const voiceStatus = document.getElementById('voice-status');
     video.style.display = 'none';
     
     return canvas.toDataURL('image/jpeg').split(',')[1];
-    }
+}
 
-    captureBtn.addEventListener('click', () => {
+captureBtn.addEventListener('click', () => {
     currentBase64Image = getCameraBase64();
     processScanning(currentBase64Image);
-    });
+});
 
-    fileInput.addEventListener('change', (e) => {
+fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function(event) {
-        imagePreview.src = event.target.result;
-        imagePreview.style.display = 'block';
-        video.style.display = 'none';
-        placeholder.style.display = 'none';
-        
-        const base64Raw = event.target.result;
-        currentBase64Image = base64Raw.includes(',') ? base64Raw.split(',')[1] : base64Raw;
-        
-        processScanning(currentBase64Image);
+            imagePreview.src = event.target.result;
+            imagePreview.style.display = 'block';
+            video.style.display = 'none';
+            placeholder.style.display = 'none';
+            
+            const base64Raw = event.target.result;
+            currentBase64Image = base64Raw.includes(',') ? base64Raw.split(',')[1] : base64Raw;
+            
+            processScanning(currentBase64Image);
         };
         reader.readAsDataURL(file);
     }
-    });
+});
 
-    // ==========================================
-    // 4. QUÉT ẢNH BAN ĐẦU & NÓI THÔNG BÁO
-    // ==========================================
-    async function processScanning(base64Data) {
+// ==========================================
+// 4. QUÉT ẢNH BAN ĐẦU
+// ==========================================
+async function processScanning(base64Data) {
     scanLine.style.display = 'block';
     loading.style.display = 'flex';
     resultContent.innerHTML = '';
     toggleInputs(false);
 
-    const quickPrompt = "Xác định tên tiếng Việt chính xác của đối tượng trong ảnh. Trả lời cực kỳ ngắn gọn dưới 15 từ.";
-    
-    // Cập nhật model thành gemini-3.8-flash chuẩn
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    try {
-        const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{
+    const payload = {
+        contents: [{
             role: "user",
             parts: [
-                { text: quickPrompt },
+                { text: "Xác định tên tiếng Việt chính xác của đối tượng trong ảnh. Trả lời cực kỳ ngắn gọn dưới 15 từ." },
                 { inline_data: { mime_type: "image/jpeg", data: base64Data } }
             ]
-            }]
-        })
-        });
+        }]
+    };
 
-        const data = await response.json();
+    try {
+        const data = await fetchWithRetry(payload);
 
         if (data.error) {
-        resultContent.innerHTML = `<p style="color:var(--danger-glow)"><strong>Lỗi Google API:</strong> ${data.error.message}</p>`;
-        return;
+            resultContent.innerHTML = `<p style="color:var(--danger-glow)"><strong>Lỗi API:</strong> ${data.error.message}</p>`;
+            return;
         }
 
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        const resultText = data.candidates[0].content.parts[0].text.trim();
-        
-        resultContent.innerHTML = marked.parse(`### ĐÃ NHẬN DIỆN THÀNH CÔNG\n\n**Đối tượng:** ${resultText}\n\n*Hệ thống đã sẵn sàng lắng nghe câu hỏi của bạn.*`);
-
-        speakText("Tôi đã quét xong. Bạn cần hỏi gì về hình ảnh này?");
-
-        toggleInputs(true);
+            const resultText = data.candidates[0].content.parts[0].text.trim();
+            resultContent.innerHTML = marked.parse(`### ĐÃ NHẬN DIỆN THÀNH CÔNG\n\n**Đối tượng:** ${resultText}\n\n*Hệ thống đã sẵn sàng lắng nghe câu hỏi của bạn.*`);
+            speakText("Tôi đã quét xong. Bạn cần hỏi gì về hình ảnh này?");
+            toggleInputs(true);
         } else {
-        resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện hình ảnh. Vui lòng tải lại ảnh.</p>';
+            resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện hình ảnh. Vui lòng thử lại.</p>';
         }
     } catch (err) {
         resultContent.innerHTML = `<p style="color:var(--danger-glow)">Lỗi kết nối: ${err.message}</p>`;
@@ -213,52 +233,43 @@ const voiceStatus = document.getElementById('voice-status');
         scanLine.style.display = 'none';
         loading.style.display = 'none';
     }
-    }
+}
 
-    // ==========================================
-    // 5. TRẢ LỜI CÂU HỎI BẰNG GIỌNG NÓI CỦA AI
-    // ==========================================
-    async function handleUserQuestion() {
+// ==========================================
+// 5. TRẢ LỜI CÂU HỎI BẰNG GIỌNG NÓI
+// ==========================================
+async function handleUserQuestion() {
     const question = userQuestion.value.trim();
     if (!question || !currentBase64Image) return;
 
     loading.style.display = 'flex';
     toggleInputs(false);
 
-    // Cập nhật model thành gemini-3.8-flash chuẩn
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    try {
-        const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{
+    const payload = {
+        contents: [{
             role: "user",
             parts: [
                 { text: `Dựa vào hình ảnh này, trả lời câu hỏi sau bằng tiếng Việt tự nhiên, cô đọng để đọc ra loa (dưới 60 từ): ${question}` },
                 { inline_data: { mime_type: "image/jpeg", data: currentBase64Image } }
             ]
-            }]
-        })
-        });
+        }]
+    };
 
-        const data = await response.json();
+    try {
+        const data = await fetchWithRetry(payload);
 
         if (data.error) {
-        alert("Lỗi API: " + data.error.message);
-        return;
+            alert("Lỗi API: " + data.error.message);
+            return;
         }
 
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        const answer = data.candidates[0].content.parts[0].text;
-        
-        resultContent.innerHTML += marked.parse(`\n---\n**🗣️ Hỏi:** ${question}\n\n**🤖 Trả lời:** ${answer}`);
-        resultContent.scrollTop = resultContent.scrollHeight;
+            const answer = data.candidates[0].content.parts[0].text;
+            resultContent.innerHTML += marked.parse(`\n---\n**🗣️ Hỏi:** ${question}\n\n**🤖 Trả lời:** ${answer}`);
+            resultContent.scrollTop = resultContent.scrollHeight;
 
-        speakText(answer);
-        
-        userQuestion.value = '';
+            speakText(answer);
+            userQuestion.value = '';
         }
     } catch (err) {
         alert("Lỗi khi gửi câu hỏi: " + err.message);
@@ -266,15 +277,15 @@ const voiceStatus = document.getElementById('voice-status');
         loading.style.display = 'none';
         toggleInputs(true);
     }
-    }
+}
 
-    function toggleInputs(enable) {
+function toggleInputs(enable) {
     userQuestion.disabled = !enable;
     askBtn.disabled = !enable;
     if (micBtn) micBtn.disabled = !enable;
-    }
+}
 
-    askBtn.addEventListener('click', handleUserQuestion);
-    userQuestion.addEventListener('keypress', (e) => {
+askBtn.addEventListener('click', handleUserQuestion);
+userQuestion.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleUserQuestion();
-    });
+});
