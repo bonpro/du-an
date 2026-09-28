@@ -15,12 +15,41 @@ const loading = document.getElementById('loading');
 const userQuestion = document.getElementById('user-question');
 const askBtn = document.getElementById('ask-btn');
 const micBtn = document.getElementById('mic-btn');
-const voiceStatus = document.getElementById('voice-status');
 
 let currentBase64Image = null;
 
 // ==========================================
-// HÀM QUÉT FACE ID VỚI MŨI TÊN HƯỚNG DẪN & TÍCH XANH
+// TẠO LỚP PHỦ HƯỚNG DẪN TRÊN CAMERA (OVERLAY)
+// ==========================================
+function createCamOverlay() {
+    let overlay = document.getElementById('cam-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'cam-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '10';
+        overlay.style.background = 'rgba(0, 0, 0, 0.2)';
+        
+        // Đảm bảo thẻ chứa video có position relative để overlay đè đúng vị trí
+        if (video.parentElement) {
+            video.parentElement.style.position = 'relative';
+            video.parentElement.appendChild(overlay);
+        }
+    }
+    return overlay;
+}
+
+// ==========================================
+// QUÉT FACE ID MÔ PHỎNG TRỰC TIẾP TRÊN CAMERA
 // ==========================================
 async function captureVideoFaceID() {
     if (!video.srcObject) {
@@ -28,9 +57,14 @@ async function captureVideoFaceID() {
         return;
     }
 
+    const overlay = createCamOverlay();
     scanLine.style.display = 'block';
     loading.style.display = 'flex';
     toggleInputs(false);
+
+    // Đảm bảo video đang hiện và xem trước ẩn đi để camera không bị đứng hình
+    video.style.display = 'block';
+    imagePreview.style.display = 'none';
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -39,38 +73,40 @@ async function captureVideoFaceID() {
 
     const capturedFrames = [];
     
-    // 4 Bước quét mô phỏng Face ID
+    // Các bước quét Face ID hiển thị trực tiếp lên Camera
     const steps = [
-        { arrow: "⬆️ HƯỚNG LÊN TRÊN", delay: 700 },
-        { arrow: "⬇️ HƯỚNG XUỐNG DƯỚI", delay: 700 },
-        { arrow: "⬅️ XOAY SANG TRÁI", delay: 700 },
-        { arrow: "➡️ XOAY SANG PHẢI", delay: 700 }
+        { arrow: "⬆️ HƯỚNG LÊN TRÊN", text: "Bước 1/4" },
+        { arrow: "⬇️ HƯỚNG XUỐNG DƯỚI", text: "Bước 2/4" },
+        { arrow: "⬅️ XOAY SANG TRÁI", text: "Bước 3/4" },
+        { arrow: "➡️ XOAY SANG PHẢI", text: "Bước 4/4" }
     ];
 
     for (let i = 0; i < steps.length; i++) {
-        resultContent.innerHTML = `<div style="text-align:center; padding:20px;">
-            <h2 style="color:#00f3ff; font-size: 2rem;">QUÉT FACE ID</h2>
-            <h1 style="color:#ff007f; font-size: 2.5rem; margin: 15px 0;">${steps[i].arrow}</h1>
-            <p>Bước ${i+1}/4 - Giữ vật thể trong khung hình...</p>
-        </div>`;
+        // Cập nhật giao diện đè lên Camera
+        overlay.innerHTML = `
+            <div style="background: rgba(0,0,0,0.65); padding: 15px 25px; border-radius: 15px; text-align: center; border: 2px solid #00f3ff; backdrop-filter: blur(4px);">
+                <h1 style="color:#ff007f; font-size: 2.2rem; margin: 0 0 5px 0; text-shadow: 0 0 10px #ff007f;">${steps[i].arrow}</h1>
+                <p style="color:#00f3ff; margin:0; font-weight:bold;">${steps[i].text} - Giữ chuyển động...</p>
+            </div>
+        `;
 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64Image = canvas.toDataURL('image/jpeg', 0.7);
         capturedFrames.push(base64Image);
 
         if (i === steps.length - 1) {
-            imagePreview.src = base64Image;
-            imagePreview.style.display = 'block';
-            video.style.display = 'none';
             currentBase64Image = base64Image.split(',')[1];
         }
 
-        await new Promise(resolve => setTimeout(resolve, steps[i].delay));
+        await new Promise(resolve => setTimeout(resolve, 800));
     }
 
-    resultContent.innerHTML = `<div style="text-align:center; padding:20px;">
-        <h2 style="color:#00f3ff;">⏳ ĐANG PHÂN TÍCH DỮ LIỆU...</h2>
-    </div>`;
+    // Hiển thị trạng thái đang xử lý trên Camera
+    overlay.innerHTML = `
+        <div style="background: rgba(0,0,0,0.7); padding: 15px 25px; border-radius: 15px; text-align: center; border: 2px solid #00f3ff;">
+            <h2 style="color:#00f3ff; margin:0;">⏳ ĐANG PHÂN TÍCH...</h2>
+        </div>
+    `;
 
     try {
         const response = await fetch(PROXY_URL, {
@@ -83,39 +119,45 @@ async function captureVideoFaceID() {
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             const resultText = data.candidates[0].content.parts[0].text.trim();
             
-            // Hiển thị TÍCH XANH NẾU THÀNH CÔNG
-            resultContent.innerHTML = `
-                <div style="text-align:center; border: 2px solid #00ff88; padding: 15px; border-radius: 10px; background: rgba(0,255,136,0.1);">
-                    <h1 style="color:#00ff88; font-size: 3rem; margin:0;">✅ THÀNH CÔNG</h1>
-                    <p style="font-size: 1.1rem; color: #fff; margin-top: 10px;">${resultText}</p>
+            // Hiển thị TÍCH XANH đè trực tiếp lên Camera
+            overlay.innerHTML = `
+                <div style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; text-align: center; border: 3px solid #00ff88; box-shadow: 0 0 20px #00ff88;">
+                    <h1 style="color:#00ff88; font-size: 3.5rem; margin:0;">✅</h1>
+                    <p style="font-size: 1.1rem; color: #fff; margin-top: 10px; font-weight:bold;">${resultText}</p>
                 </div>
             `;
+            
+            resultContent.innerHTML = `### KẾT QUẢ QUÉT:\n${resultText}`;
             speakText(resultText);
             toggleInputs(true);
         } else {
-            // Hiển thị DẤU X ĐỎ NẾU LỖI
-            resultContent.innerHTML = `
-                <div style="text-align:center; border: 2px solid #ff4444; padding: 15px; border-radius: 10px; background: rgba(255,68,68,0.1);">
-                    <h1 style="color:#ff4444; font-size: 3rem; margin:0;">❌ LỖI NHẬN DẠNG</h1>
-                    <p style="color:#fff;">Không nhận diện được. Vui lòng quét lại!</p>
+            // Hiển thị DẤU X ĐỎ đè lên Camera
+            overlay.innerHTML = `
+                <div style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; text-align: center; border: 3px solid #ff4444;">
+                    <h1 style="color:#ff4444; font-size: 3.5rem; margin:0;">❌</h1>
+                    <p style="color:#fff; margin-top:5px;">Lỗi nhận diện. Hãy thử lại!</p>
                 </div>
             `;
         }
     } catch (err) {
-        resultContent.innerHTML = `
-            <div style="text-align:center; border: 2px solid #ff4444; padding: 15px; border-radius: 10px;">
-                <h1 style="color:#ff4444; font-size: 3rem; margin:0;">❌ LỖI KẾT NỐI</h1>
-                <p style="color:#fff;">${err.message}</p>
+        overlay.innerHTML = `
+            <div style="background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 2px solid #ff4444;">
+                <h2 style="color:#ff4444; margin:0;">❌ LỖI KẾT NỐI</h2>
             </div>
         `;
     } finally {
         scanLine.style.display = 'none';
         loading.style.display = 'none';
+        
+        // Tự động ẩn lớp phủ hướng dẫn sau 4 giây để xem lại camera bình thường
+        setTimeout(() => {
+            if (overlay) overlay.innerHTML = '';
+        }, 4000);
     }
 }
 
 // ==========================================
-// CÁC HÀM XỬ LÝ KHÁC (GIỮ NGUYÊN)
+// CÁC BỘ PHẬN KHÁC (GIỮ NGUYÊN)
 // ==========================================
 function speakText(text) {
     if (!('speechSynthesis' in window)) return;
