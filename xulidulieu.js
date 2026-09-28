@@ -20,47 +20,87 @@ const voiceStatus = document.getElementById('voice-status');
 let currentBase64Image = null;
 
 // ==========================================
-// TỰ ĐỘNG THỬ LẠI KHI GOOGLE BỊ QUÁ TẢI (RETRY LOGIC)
+// HÀM GỬI FETCH CÓ TỰ ĐỘNG THỬ LẠI (RETRY LOGIC)
+// ==========================================
+async function fetchWithRetry(payload, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
+}
+
+// ==========================================
+// HÀM QUÉT VIDEO ĐA GÓC KIỂU FACE ID (QUAY 3 SEC)
 // ==========================================
 async function captureVideoFaceID() {
-  const videoElement = document.getElementById('webcam'); // Đảm bảo ID đúng với thẻ <video> của bạn
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  
-  canvas.width = videoElement.videoWidth || 640;
-  canvas.height = videoElement.videoHeight || 480;
+    if (!video.srcObject) {
+        alert("Vui lòng bật Camera trước khi quét!");
+        return;
+    }
 
-  const capturedFrames = [];
-  const totalFrames = 4; // Lấy 4 góc quay khác nhau
-  const interval = 800;  // Mỗi 0.8 giây chụp 1 góc
+    scanLine.style.display = 'block';
+    loading.style.display = 'flex';
+    resultContent.innerHTML = '<p style="color:#00f3ff"><strong>Đang quét đa góc...</strong> Vui lòng hướng vật thể lên, xuống và xoay nhẹ góc!</p>';
+    toggleInputs(false);
 
-  showStatusUI("Đang quét Face ID... Hãy hướng vật thể lên, xuống, xoay nhẹ góc!");
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
 
-  for (let i = 0; i < totalFrames; i++) {
-    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-    const base64Image = canvas.toDataURL('image/jpeg', 0.7); // Nén ảnh 70% để gửi nhẹ và nhanh
-    capturedFrames.push(base64Image);
-    
-    // Đợi 0.8s cho lần chụp tiếp theo
-    await new Promise(resolve => setTimeout(resolve, interval));
-  }
+    const capturedFrames = [];
+    const totalFrames = 4; // Lấy 4 góc quay khác nhau
+    const interval = 700;  // Mỗi 0.7s chụp 1 góc
 
-  showStatusUI("Đang phân tích dữ liệu đa góc...");
+    for (let i = 0; i < totalFrames; i++) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const base64Image = canvas.toDataURL('image/jpeg', 0.7);
+        capturedFrames.push(base64Image);
+        
+        // Lưu lại khung hình cuối làm ảnh đại diện
+        if (i === totalFrames - 1) {
+            imagePreview.src = base64Image;
+            imagePreview.style.display = 'block';
+            video.style.display = 'none';
+            currentBase64Image = base64Image.split(',')[1];
+        }
 
-  // Gửi mảng ảnh sang Cloudflare Worker
-  fetch('https://lively-glade-ec31.lacvantieu95.workers.dev/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ images: capturedFrames })
-  })
-  .then(res => res.json())
-  .then(data => {
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    renderResultUI(reply);
-  })
-  .catch(err => {
-    renderErrorUI("Lỗi quét: " + err.message);
-  });
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    resultContent.innerHTML = '<p style="color:#00f3ff">Đang gửi dữ liệu đa góc sang AI phân tích...</p>';
+
+    try {
+        const data = await fetchWithRetry({ images: capturedFrames });
+
+        if (data.error) {
+            resultContent.innerHTML = `<p style="color:var(--danger-glow)"><strong>Lỗi API:</strong> ${data.error.message}</p>`;
+            return;
+        }
+
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+            const resultText = data.candidates[0].content.parts[0].text.trim();
+            resultContent.innerHTML = marked.parse(`### KẾT QUẢ PHÂN TÍCH ĐA GÓC\n\n${resultText}\n\n*Bạn có thể đặt câu hỏi chi tiết thêm bên dưới.*`);
+            speakText(resultText);
+            toggleInputs(true);
+        } else {
+            resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện video. Vui lòng thử lại.</p>';
+        }
+    } catch (err) {
+        resultContent.innerHTML = `<p style="color:var(--danger-glow)">Lỗi kết nối: ${err.message}</p>`;
+    } finally {
+        scanLine.style.display = 'none';
+        loading.style.display = 'none';
+    }
 }
 
 // ==========================================
@@ -167,23 +207,9 @@ startBtn.addEventListener('click', async () => {
     }
 });
 
-function getCameraBase64() {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    imagePreview.src = canvas.toDataURL('image/jpeg');
-    imagePreview.style.display = 'block';
-    video.style.display = 'none';
-    
-    return canvas.toDataURL('image/jpeg').split(',')[1];
-}
-
+// Bấm nút QUÉT CAMERA sẽ kích hoạt Quét Đa Góc Face ID
 captureBtn.addEventListener('click', () => {
-    currentBase64Image = getCameraBase64();
-    processScanning(currentBase64Image);
+    captureVideoFaceID();
 });
 
 fileInput.addEventListener('change', (e) => {
@@ -206,7 +232,7 @@ fileInput.addEventListener('change', (e) => {
 });
 
 // ==========================================
-// 4. QUÉT ẢNH BAN ĐẦU
+// 4. QUÉT ẢNH ĐƠN (Dùng cho ảnh tải lên)
 // ==========================================
 async function processScanning(base64Data) {
     scanLine.style.display = 'block';
@@ -218,7 +244,7 @@ async function processScanning(base64Data) {
         contents: [{
             role: "user",
             parts: [
-                { text: "Xác định tên tiếng Việt chính xác của đối tượng trong ảnh. Trả lời cực kỳ ngắn gọn dưới 15 từ." },
+                { text: "Xác định tên tiếng Việt chính xác của đối tượng trong ảnh và tình trạng của nó dưới 30 từ." },
                 { inline_data: { mime_type: "image/jpeg", data: base64Data } }
             ]
         }]
@@ -234,8 +260,8 @@ async function processScanning(base64Data) {
 
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             const resultText = data.candidates[0].content.parts[0].text.trim();
-            resultContent.innerHTML = marked.parse(`### ĐÃ NHẬN DIỆN THÀNH CÔNG\n\n**Đối tượng:** ${resultText}\n\n*Hệ thống đã sẵn sàng lắng nghe câu hỏi của bạn.*`);
-            speakText("Tôi đã quét xong. Bạn cần hỏi gì về hình ảnh này?");
+            resultContent.innerHTML = marked.parse(`### ĐÃ NHẬN DIỆN THÀNH CÔNG\n\n${resultText}`);
+            speakText(resultText);
             toggleInputs(true);
         } else {
             resultContent.innerHTML = '<p style="color:var(--danger-glow)">Không thể nhận diện hình ảnh. Vui lòng thử lại.</p>';
